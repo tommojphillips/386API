@@ -209,6 +209,37 @@ public class I386 {
         i386.textString.Value = string.Empty;
         i386.consoleText.text = i386.oldString.Value;
     }
+    /// <summary>
+    /// POS Get Char. returns char if pressed otherwise returns '\0'
+    /// </summary>
+    public static char POS_GetChar() {
+        Event e = Event.current;
+        if (!i386.playerComputer.Value || e.type != EventType.KeyDown) {
+            return '\0';
+        }
+
+        switch (e.keyCode) {
+            case KeyCode.Backspace: 
+                return '\b';
+            case KeyCode.Return: 
+                return '\n';
+            case KeyCode.Tab: 
+                return '\t';
+        }
+
+        return e.character;
+    }
+    /// <summary>
+    /// POS Get Key Code. returns pressed keycode
+    /// </summary>
+    public static KeyCode POS_GetKeyCode() {
+        Event e = Event.current;        
+        if (!i386.playerComputer.Value || e.type != EventType.KeyDown) {
+            return KeyCode.None;
+        }
+
+        return e.keyCode;
+    }
 
     /// <summary>
     /// Get key

@@ -3,6 +3,7 @@ using MSCLoader;
 using HutongGames.PlayMaker;
 using System.Collections.Generic;
 using System.Collections;
+using System;
 
 namespace I386API;
 
@@ -49,9 +50,9 @@ public class I386 {
     public static bool PhoneBillPaid => i386.phonePaid.Value;
 
     /// <summary>
-    /// Is PC powered on
+    /// Is the player using/controlling the PC
     /// </summary>
-    //public static bool PowerOn = i386.powerOn.Value;
+    public static bool PlayerControl => i386.playerComputer.Value;
 
     /// <summary>
     /// The command arguments
@@ -82,8 +83,16 @@ public class I386 {
     /*internal FsmBool fuse;
     internal FsmBool powerOn;*/
 
+    internal Queue<char> charBuffer;
+    internal Queue<KeyCode> keyBuffer;
+    internal KeyCode[] keys;
+
     internal I386() {
         commands = new Dictionary<string, Command>();
+
+        charBuffer = new Queue<char>();
+        keyBuffer = new Queue<KeyCode>();
+        keys = (KeyCode[])Enum.GetValues(typeof(KeyCode));
 
         gameObject = GameObject.Find("COMPUTER");
         transform = gameObject.transform;
@@ -213,32 +222,33 @@ public class I386 {
     /// POS Get Char. returns char if pressed otherwise returns '\0'
     /// </summary>
     public static char POS_GetChar() {
-        Event e = Event.current;
-        if (!i386.playerComputer.Value || e.type != EventType.KeyDown) {
+        if (!i386.playerComputer.Value || i386.charBuffer.Count == 0) {
             return '\0';
         }
 
-        switch (e.keyCode) {
-            case KeyCode.Backspace: 
-                return '\b';
-            case KeyCode.Return: 
-                return '\n';
-            case KeyCode.Tab: 
-                return '\t';
-        }
-
-        return e.character;
+        return i386.charBuffer.Dequeue();
+    }
+    /// <summary>
+    /// POS Clear the character buffer
+    /// </summary>
+    public static void POS_ClearCharBuffer() {
+        i386.charBuffer.Clear();
     }
     /// <summary>
     /// POS Get Key Code. returns pressed keycode
     /// </summary>
     public static KeyCode POS_GetKeyCode() {
-        Event e = Event.current;        
-        if (!i386.playerComputer.Value || e.type != EventType.KeyDown) {
+        if (!i386.playerComputer.Value || i386.keyBuffer.Count == 0) {
             return KeyCode.None;
         }
 
-        return e.keyCode;
+        return i386.keyBuffer.Dequeue();
+    }
+    /// <summary>
+    /// POS Clear the keycode buffer
+    /// </summary>
+    public static void POS_ClearKeyBuffer() {
+        i386.keyBuffer.Clear();
     }
 
     /// <summary>
@@ -279,6 +289,97 @@ public class I386 {
     private void exitCommand() {
         commandFsm.SendEvent("FINISHED");
         currentCommand = null;
+        clearInput();
+    }
+    private char keyToChar(KeyCode key) {
+        bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+        if (key >= KeyCode.A && key <= KeyCode.Z) {
+            char c = (char)('a' + (key - KeyCode.A));
+            return shift ? Char.ToUpper(c) : c;
+        }
+
+        if (key >= KeyCode.Alpha0 && key <= KeyCode.Alpha9) {
+            string normal = "0123456789";
+            string shifted = ")!@#$%^&*(";
+            int i = key - KeyCode.Alpha0;
+            return shift ? shifted[i] : normal[i];
+        }
+
+        if (key >= KeyCode.Keypad0 && key <= KeyCode.Keypad9) {
+            return (char)('0' + (key - KeyCode.Keypad0));
+        }
+
+        switch (key) {
+            case KeyCode.Space:
+                return ' ';
+            case KeyCode.Return:
+                return '\n';
+            case KeyCode.Backspace:
+                return '\b';
+            case KeyCode.Tab:
+                return '\t';
+            case KeyCode.Period:
+                return shift ? '>' : '.';
+            case KeyCode.Comma:
+                return shift ? '<' : ',';
+            case KeyCode.Minus:
+                return shift ? '_' : '-';
+            case KeyCode.Equals:
+                return shift ? '+' : '=';
+            case KeyCode.Semicolon: 
+                return shift ? ':' : ';';
+            case KeyCode.Quote:
+                return shift ? '"' : '\'';
+            case KeyCode.Slash:
+                return shift ? '?' : '/';
+            case KeyCode.Backslash:
+                return shift ? '|' : '\\';
+            case KeyCode.LeftBracket: 
+                return shift ? '{' : '[';
+            case KeyCode.RightBracket: 
+                return shift ? '}' : ']';
+            case KeyCode.BackQuote: 
+                return shift ? '~' : '`';
+            case KeyCode.KeypadPeriod:
+                return '.';
+            case KeyCode.KeypadPlus:
+                return '+';
+            case KeyCode.KeypadMinus:
+                return '-';
+            case KeyCode.KeypadMultiply:
+                return '*';
+            case KeyCode.KeypadDivide:
+                return '/';
+            case KeyCode.KeypadEnter:
+                return '\n';
+        }
+
+        return '\0';
+    }
+    private void updateInput() {
+        if (!i386.playerComputer.Value) {
+            return;
+        }
+
+        foreach (KeyCode key in keys) {
+            if (!Input.GetKeyDown(key)) {
+                continue;
+            }
+
+            if (key != KeyCode.None) {
+            keyBuffer.Enqueue(key);
+            }
+
+            char c = keyToChar(key);
+            if (c != '\0') {
+                charBuffer.Enqueue(c);
+        }
+        }
+    }
+    private void clearInput() {
+        charBuffer.Clear();
+        keyBuffer.Clear();
     }
 
     // Callbacks/Events
@@ -304,6 +405,8 @@ public class I386 {
         }
     }
     private void onCustomCommandUpdate() {
+        updateInput();
+
         bool t = true;
         if (currentCommand?.OnUpdate != null) {
             t = currentCommand.OnUpdate.Invoke();
@@ -314,6 +417,8 @@ public class I386 {
         }
     }
     private void onCustomCommandEnter() {
+        clearInput();
+        
         bool t = false;
         if (currentCommand?.OnEnter != null) {
             t = currentCommand.OnEnter.Invoke();

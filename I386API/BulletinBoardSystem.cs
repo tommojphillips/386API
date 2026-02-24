@@ -23,6 +23,7 @@ public class BulletinBoardSystem {
     /// Add command to BBS
     /// </summary>
     /// <param name="exe">The EXE name</param>
+    /// <param name="kb">The EXE size</param>
     public static void Add(string exe, int kb = 320) {
 
         if (i386 == null) {

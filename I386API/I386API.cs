@@ -6,7 +6,7 @@ internal class I386API : Mod {
     public override string ID => "I386API";
     public override string Name => "I386 API";
     public override string Author => "tommojphillips";
-    public override string Version => "1.1";
+    public override string Version => "1.2";
     public override string Description => "I386 API";
     public override Game SupportedGames => Game.MyWinterCar;
 

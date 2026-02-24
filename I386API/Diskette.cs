@@ -82,6 +82,12 @@ public class Diskette {
     /// <param name="defaultPosition">Default position if save info doesnt exist</param>
     /// <param name="defaultEulerAngles">Default rotation if save info doesnt exist</param>
     public static Diskette Create(string exe, Vector3 defaultPosition = default, Vector3 defaultEulerAngles = default) {
+
+        if (i386 == null) {
+            ModConsole.Error($"[386API] Not ready. Your mod is loading before 386API is initialized. Are you using PreLoad?");
+            return null;
+        }
+
         Diskette diskette = new Diskette();
 
         GameObject g = GameObject.Instantiate(i386.floppyPrefab);

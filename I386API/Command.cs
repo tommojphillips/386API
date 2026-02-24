@@ -1,5 +1,5 @@
 ﻿using System;
-
+using MSCLoader;
 using static I386API.I386;
 
 namespace I386API;
@@ -30,22 +30,70 @@ public class Command {
     }
 
     /// <summary>
-    /// Create a i386 POS commmand
+    /// Create an external command
     /// </summary>
-    /// <param name="exe">The exe name</param>
+    /// <param name="exe">EXE name</param>
     /// <param name="enter">Enter func</param>
     /// <param name="update">Update func</param>
     public static Command Create(string exe, Func<bool> enter, Func<bool> update) {
+        
+        if (i386 == null) {
+            ModConsole.Error($"[386API] Not ready. Your mod is loading before 386API is initialized. Are you using PreLoad?");
+            return null;
+        }
+
+        // check commands. we shouldnt have this command in both lists.
+        if (i386.builtInCommands.ContainsKey(exe)) {
+            ModConsole.Error($"[386API] {exe} already exists in builtin-commands. You cannot have an external-command that is also a builtin-command");
+            return null;
+        }
+
+        if (i386.commands.ContainsKey(exe)) {
+            ModConsole.Error($"[386API] {exe} already exists in external-commands");
+            return null;
+        }
+
         Command command = new Command();
         command.OnEnter = enter;
         command.OnUpdate = update;
+        i386.commands.Add(exe, command);
+        return command;
+    }
 
+    /// <summary>
+    /// Create a built in command
+    /// </summary>
+    /// <param name="exe">EXE name</param>
+    /// <param name="enter">Enter func</param>
+    /// <param name="update">Update func</param>
+    public static Command CreateBuiltIn(string exe, Func<bool> enter, Func<bool> update) {
+
+        if (i386 == null) {
+            ModConsole.Error($"[386API] Not ready. Your mod is loading before 386API is initialized. Are you using PreLoad?");
+            return null;
+        }
+
+        for (int i = 0; i < i386.bbsCommands.Count; i++) {
+            if (i386.bbsCommands[i].exe == exe) {
+                ModConsole.Error($"[386API] {exe} already exists in bbs-commands. You cannot have a builtin-command that is also a bbs-command.");
+                return null;
+            }
+        }
+        
         if (i386.commands.ContainsKey(exe)) {
-            i386.commands[exe] = command;
+            ModConsole.Error($"[386API] {exe} already exists in external-commands. You cannot have a builtin-command that is also an external-command.");
+            return null;
         }
-        else {
-            i386.commands.Add(exe, command);
+
+        if (i386.builtInCommands.ContainsKey(exe)) {
+            ModConsole.Error($"[386API] {exe} already exists in built in commands");
+            return null;
         }
+
+        Command command = new Command();
+        command.OnEnter = enter;
+        command.OnUpdate = update;
+        i386.builtInCommands.Add(exe, command);
         return command;
     }
 }

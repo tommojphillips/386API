@@ -243,10 +243,17 @@ public class I386 {
         type.FsmInject("Player input 2", onBBSBrowseFiles, true);
         bbs_mode = type.GetVariable<FsmString>("Mode");
 
+        // fix mode not being set when in chat mode and changing modes to files/ranks.
         Transform chat = conline.Find("CHAT");
         PlayMakerFSM chat_type = chat.GetPlayMaker("Type");
         chat_type.FsmInject("Check mode", onBBSFixChat, false, 4);
         bbs_chat_mode = chat_type.GetVariable<FsmString>("Mode");
+
+        // fix telebbs text disappearing
+        Transform bbs_bg1 = telebbs.Find("Software/bg 1");
+        bbs_bg1.localPosition = new Vector3(0f, -7.05f, 2.0f);
+        bbs_bg1.localEulerAngles = Vector3.zero;
+        bbs_bg1.localScale = new Vector3(20f, 0.6f, 0.54f);
 
         bbs_download = initialize.GetPlayMaker("Download");
         bbs_download.InitializeFSM();

@@ -90,7 +90,7 @@ public class Diskette {
 
         Diskette diskette = new Diskette();
 
-        GameObject g = GameObject.Instantiate(i386.floppyPrefab);
+        GameObject g = Object.Instantiate(i386.floppyPrefab);
         g.name = "diskette(itemx)";
         g.transform.position = defaultPosition;
         g.transform.eulerAngles = defaultEulerAngles;
@@ -130,7 +130,7 @@ public class Diskette {
             if (diskette._renderer != null && diskette._filter != null) {
 
                 Mesh original = diskette._filter.sharedMesh;
-                Mesh m = GameObject.Instantiate(original);
+                Mesh m = Object.Instantiate(original);
                 diskette._filter.mesh = m;
 
                 int[] triangles = m.GetTriangles(1);

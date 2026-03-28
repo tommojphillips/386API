@@ -20,11 +20,11 @@ public class I386 {
     /// <summary>
     /// I386 game object
     /// </summary>
-    public GameObject gameObject;
+    public static GameObject GameObject => i386.gameObject;
     /// <summary>
     /// I386 transform
     /// </summary>
-    public Transform transform;
+    public static Transform Transform => i386.transform;
 
     /// <summary>
     /// The Dial Up speed in bits per second
@@ -37,17 +37,17 @@ public class I386 {
     /// <summary>
     /// Is Modem connected to telephone landline
     /// </summary>
-    public static bool ModemConnected => i386.modemCord.Value && i386.phonePaid.Value;
+    public static bool ModemConnected => i386.modemConnected() && i386.phonePaid();
 
     /// <summary>
     /// Is Modem cord connected to outlet
     /// </summary>
-    public static bool ModemCord => i386.modemCord.Value;
+    public static bool ModemCord => i386.modemConnected();
 
     /// <summary>
     /// Is phone bill payed
     /// </summary>
-    public static bool PhoneBillPaid => i386.phonePaid.Value;
+    public static bool PhoneBillPaid => i386.phonePaid();
 
     /// <summary>
     /// Is the player using/controlling the PC
@@ -58,6 +58,35 @@ public class I386 {
     /// The command arguments
     /// </summary>
     public static string[] Args { get; internal set; }
+
+    /// <summary>
+    /// On turn PC Off event
+    /// </summary>
+    public static event Action OnTurnOff;
+    /// <summary> 
+    /// On turn PC On event
+    /// </summary>
+    public static event Action OnTurnOn;
+
+    /// <summary>
+    /// The PC Case
+    /// </summary>
+    public static GameObject Case => i386.pcCase;
+    /// <summary>
+    /// The PC Monitor
+    /// </summary>
+    public static GameObject Monitor => i386.pcMonitor;
+    /// <summary>
+    /// The PC Peripherals
+    /// </summary>
+    public static GameObject Peripherals => i386.pcPeripherals;
+    /// <summary>
+    /// The PC Speakers
+    /// </summary>
+    public static GameObject Speakers => i386.pcSpeakers;
+
+    internal GameObject gameObject;
+    internal Transform transform;
 
     internal PlayMakerFSM commandFsm;
     internal FsmString saveFile;
@@ -80,9 +109,7 @@ public class I386 {
     internal FsmString textString;
     internal FsmString errorString;
     internal FsmBool playerComputer;
-    internal FsmBool modemCord;
-    internal FsmBool phonePaid;
-
+    
     internal TextMesh bbsText;
     internal FsmString bbs_command;
     internal FsmString bbs_downloadFileName;
@@ -98,6 +125,20 @@ public class I386 {
 
     internal TextMesh bootSequenceTextMesh;
 
+    internal GameObject pcCase;
+    internal GameObject pcMonitor;
+    internal GameObject pcPeripherals;
+    internal GameObject pcSpeakers;
+
+    internal struct InstallPoint {
+        internal FsmInt assemblyID;
+        internal FsmBool installed;
+        internal FsmBool modemCord;
+        internal FsmBool phonePaid;
+    }
+
+    internal List<InstallPoint> installPoints;
+
     internal I386() {
         commands = new Dictionary<string, Command>();
         builtInCommands = new Dictionary<string, Command>();
@@ -109,7 +150,10 @@ public class I386 {
 
         gameObject = GameObject.Find("COMPUTER");
         transform = gameObject.transform;
-        
+
+        OnTurnOff = null;
+        OnTurnOn = null;
+
         // Custom command setup
 
         pos = transform.Find("SYSTEM/POS");
@@ -162,13 +206,107 @@ public class I386 {
 
         // Modem setup
 
-        GameObject modemCord_go = GameObject.Find("YARD/Building/LIVINGROOM/Telephone 1/Cord");
-        PlayMakerFSM modemCord_fsm = modemCord_go.GetPlayMaker("Use");
-        modemCord = modemCord_fsm.GetVariable<FsmBool>("CordModem");
+        installPoints = new List<InstallPoint>();
+        GameObject PCPartsDB = GameObject.Find("Database/AssemblyDBOthers");
+        if (PCPartsDB != null) {
+            PlayMakerArrayListProxy caseInstallPoints = PCPartsDB.GetArrayListProxy("386Case");
+            if (caseInstallPoints != null) {
+                for (int i = 0; i < caseInstallPoints._arrayList.Count; ++i) {
+                    GameObject pcCase = (GameObject)caseInstallPoints._arrayList[i];
+                    if (pcCase == null) {
+                        continue;
+                    }
 
-        GameObject phoneBill1_go = GameObject.Find("Systems/PhoneBills1");
-        PlayMakerFSM phoneBill1_fsm = phoneBill1_go.GetPlayMaker("Data");
-        phonePaid = phoneBill1_fsm.GetVariable<FsmBool>("PhonePaid");
+                    PlayMakerFSM data = pcCase.GetPlayMaker("Data");
+                    InstallPoint installPoint = new InstallPoint();
+                    installPoint.assemblyID = i;
+                    installPoint.installed = data.GetVariable<FsmBool>("Installed");
+                    if (i == 1) {
+                        // Apartment
+                        GameObject modemCord_go = GameObject.Find("HOMENEW/Functions/FunctionsDisable/Telephone/Cord");
+                        PlayMakerFSM modemCord_fsm = modemCord_go.GetPlayMaker("Use");
+                        installPoint.modemCord = modemCord_fsm.GetVariable<FsmBool>("CordModem");
+
+                        GameObject phoneBill_go = GameObject.Find("Systems/PhoneBills2");
+                        PlayMakerFSM phoneBill_fsm = phoneBill_go.GetPlayMaker("Data");
+                        installPoint.phonePaid = phoneBill_fsm.GetVariable<FsmBool>("PhonePaid");
+                    }
+                    else if (i == 2) {
+                        // Parents house
+                        GameObject modemCord_go = GameObject.Find("YARD/Building/LIVINGROOM/Telephone 1/Cord");
+                        PlayMakerFSM modemCord_fsm = modemCord_go.GetPlayMaker("Use");
+                        installPoint.modemCord = modemCord_fsm.GetVariable<FsmBool>("CordModem");
+
+                        GameObject phoneBill_go = GameObject.Find("Systems/PhoneBills1");
+                        PlayMakerFSM phoneBill_fsm = phoneBill_go.GetPlayMaker("Data");
+                        installPoint.phonePaid = phoneBill_fsm.GetVariable<FsmBool>("PhonePaid");
+                    }
+                    else {
+                        ModConsole.Error($"[386API] Error: Unknown assemblyID: {i}");
+                        return;
+                    }
+
+                    installPoints.Add(installPoint);
+                }
+            }
+            else {
+                ModConsole.Error("[386API] Error: Database/AssemblyDBOthers.386Case not found");
+                return;
+            }
+        }
+        else {
+            ModConsole.Error("[386API] Error: Database/AssemblyDBOthers not found");
+            return;
+        }
+
+        GameObject fleaMarketProducts = GameObject.Find("FleaMarketProducts");
+        if (fleaMarketProducts != null) {
+            PlayMakerArrayListProxy fleaMarketItems = fleaMarketProducts.GetArrayListProxy("Items");
+            if (fleaMarketItems != null && fleaMarketItems._arrayList.Count >= 4) {
+                pcCase = (GameObject)fleaMarketItems._arrayList[0];
+                pcSpeakers = (GameObject)fleaMarketItems._arrayList[1];
+                pcPeripherals = (GameObject)fleaMarketItems._arrayList[2];
+                pcMonitor = (GameObject)fleaMarketItems._arrayList[3];
+            }
+            else {
+                ModConsole.Error("[386API] Error: FleaMarketItems not found");
+                return;
+            }
+        }
+        else {
+            ModConsole.Error("[386API] Error: FleaMarketProducts not found");
+            return;
+        }
+
+        if (pcCase == null) {
+            ModConsole.Error("[386API] Error: FleaMarketItems.386case not found");
+            return;
+        }
+        if (pcMonitor == null) {
+            ModConsole.Error("[386API] Error: FleaMarketItems.pcMonitor not found");
+            return;
+        }
+        if (pcPeripherals == null) {
+            ModConsole.Error("[386API] Error: FleaMarketItems.pcPeripherals not found");
+            return;
+        }
+        if (pcSpeakers == null) {
+            ModConsole.Error("[386API] Error: FleaMarketItems.pcSpeakers not found");
+            return;
+        }
+
+        // Off/On button hook
+        Transform offButton = pcCase.transform.Find("Functions/ButtonPower");
+        PlayMakerFSM offButton_fsm = offButton.GetPlayMaker("Use");
+        offButton_fsm.FsmInject("OFF", onTurnOff, false, 2, false);
+        offButton_fsm.FsmInject("OFF 2", onTurnOff, false, 2, false);
+        offButton_fsm.FsmInject("ON", onTurnOn, false, 1, false);
+        offButton_fsm.FsmInject("ON 2", onTurnOn, false, 1, false);
+
+        // Reset button hook
+        Transform resetButton = pcCase.transform.Find("Functions/ButtonReset");
+        PlayMakerFSM resetButton_fsm = resetButton.GetPlayMaker("Use");
+        resetButton_fsm.FsmInject("State 1", onTurnOff, false, 1, false);
 
         // PC vars
 
@@ -213,17 +351,17 @@ public class I386 {
         Transform game10 = files.Find("game 10");
 
         // move all existing games on bbs to the left; making room for custom bbs programs
-        game0.localPosition = new Vector3(-6f, game0.localPosition.y, 11.57f);
-        game1.localPosition = new Vector3(-6f, game1.localPosition.y, 11.57f);
-        game2.localPosition = new Vector3(-6f, game2.localPosition.y, 11.57f);
-        game3.localPosition = new Vector3(-6f, game3.localPosition.y, 11.57f);
-        game4.localPosition = new Vector3(-6f, game4.localPosition.y, 11.57f);
-        game5.localPosition = new Vector3(-6f, game5.localPosition.y, 11.57f);
-        game6.localPosition = new Vector3(-6f, game6.localPosition.y, 11.57f);
-        game7.localPosition = new Vector3(-6f, game7.localPosition.y, 11.57f);
-        game8.localPosition = new Vector3(-6f, game8.localPosition.y, 11.57f);
-        game9.localPosition = new Vector3(-6f, game9.localPosition.y, 11.57f);
-        game10.localPosition = new Vector3(-6f, game10.localPosition.y, 11.57f);
+        if (game0) game0.localPosition = new Vector3(-6f, game0.localPosition.y, 11.57f);
+        if (game1) game1.localPosition = new Vector3(-6f, game1.localPosition.y, 11.57f);
+        if (game2) game2.localPosition = new Vector3(-6f, game2.localPosition.y, 11.57f);
+        if (game3) game3.localPosition = new Vector3(-6f, game3.localPosition.y, 11.57f);
+        if (game4) game4.localPosition = new Vector3(-6f, game4.localPosition.y, 11.57f);
+        if (game5) game5.localPosition = new Vector3(-6f, game5.localPosition.y, 11.57f);
+        if (game6) game6.localPosition = new Vector3(-6f, game6.localPosition.y, 11.57f);
+        if (game7) game7.localPosition = new Vector3(-6f, game7.localPosition.y, 11.57f);
+        if (game8) game8.localPosition = new Vector3(-6f, game8.localPosition.y, 11.57f);
+        if (game9) game9.localPosition = new Vector3(-6f, game9.localPosition.y, 11.57f);
+        if (game10) game10.localPosition = new Vector3(-6f, game10.localPosition.y, 11.57f);
         
         // create new text for custom bbs programs
         GameObject cGame = GameObject.Instantiate(game0.gameObject);
@@ -275,7 +413,7 @@ public class I386 {
     }
 
     /// <summary>
-    /// Get the time it would take to download x bytes at baud speed.
+    /// Get the time it would take to download x bytes at current baud speed.
     /// </summary>
     /// <param name="bytes">Number of bytes</param>
     public static float GetDownloadTime(int bytes) {
@@ -400,11 +538,18 @@ public class I386 {
     public static void StopCoroutine(Coroutine coroutine) {
         i386.commandFsm.StopCoroutine(coroutine);
     }
+    /// <summary>
+    /// Stop all coroutines
+    /// </summary>
+    public static void StopAllCoroutines() {
+        i386.commandFsm.StopAllCoroutines();
+    }
 
     private void exitCommand() {
         commandFsm.SendEvent("FINISHED");
         currentCommand = null;
         clearInput();
+        StopAllCoroutines();
     }
     private char keyToChar(KeyCode key) {
         bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
@@ -499,7 +644,26 @@ public class I386 {
     private void clearBootText() {
         bootSequenceTextMesh.text = "";
     }
-    
+    private void setBootText(string message) {
+        bootSequenceTextMesh.text = message;
+    }
+    private bool phonePaid() {
+        for (int i = 0; i < installPoints.Count; ++i) {
+            if (installPoints[i].installed.Value) {
+                return installPoints[i].phonePaid.Value;
+            }
+        }
+        return false;
+    }
+    private bool modemConnected() {
+        for (int i = 0; i < installPoints.Count; ++i) {
+            if (installPoints[i].installed.Value) {
+                return installPoints[i].modemCord.Value;
+            }
+        }
+        return false;
+    }
+
     // Callbacks/Events
 
     private void onInit() {
@@ -609,5 +773,14 @@ public class I386 {
         // this is only called when in bbs in chat
         // fix bbs mode not being set when in chat mode and changing mode to /r or /f
         bbs_mode.Value = bbs_chat_mode.Value;
+    }
+    private void onTurnOff() {
+        if (currentCommand != null) {
+            exitCommand();
+        }
+        OnTurnOff?.Invoke();
+    }
+    private void onTurnOn() {
+        OnTurnOn?.Invoke();
     }
 }

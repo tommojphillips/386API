@@ -217,34 +217,62 @@ public class I386 {
                         continue;
                     }
 
-                    PlayMakerFSM data = pcCase.GetPlayMaker("Data");
-                    InstallPoint installPoint = new InstallPoint();
-                    installPoint.assemblyID = i;
-                    installPoint.installed = data.GetVariable<FsmBool>("Installed");
-                    if (i == 1) {
-                        // Apartment
-                        GameObject modemCord_go = GameObject.Find("HOMENEW/Functions/FunctionsDisable/Telephone/Cord");
-                        PlayMakerFSM modemCord_fsm = modemCord_go.GetPlayMaker("Use");
-                        installPoint.modemCord = modemCord_fsm.GetVariable<FsmBool>("CordModem");
+                    GameObject modemCord_go = null;
+                    GameObject phoneBill_go = null;
+                    PlayMakerFSM modemCord_fsm = null;
+                    PlayMakerFSM phoneBill_fsm = null;
+                    PlayMakerFSM pcCaseData = null;
+                    FsmBool pcCaseInstalled = null;
+                    FsmBool modemConnected = null;
+                    FsmBool phonePaid = null;
 
-                        GameObject phoneBill_go = GameObject.Find("Systems/PhoneBills2");
-                        PlayMakerFSM phoneBill_fsm = phoneBill_go.GetPlayMaker("Data");
-                        installPoint.phonePaid = phoneBill_fsm.GetVariable<FsmBool>("PhonePaid");
+                    switch (i) {
+
+                        case 1: // Apartment
+                            modemCord_go = GameObject.Find("HOMENEW/Functions/FunctionsDisable/Telephone/Cord");
+                            phoneBill_go = GameObject.Find("Systems/PhoneBills2");
+                            break;
+
+                        case 2: // Parents house
+                            modemCord_go = GameObject.Find("YARD/Building/LIVINGROOM/Telephone 1/Cord");
+                            phoneBill_go = GameObject.Find("Systems/PhoneBills1");
+                            break;
+                        
+                        default:
+                            ModConsole.Error($"[386API] Error: Unknown assemblyID: {i}");
+                            return;
                     }
-                    else if (i == 2) {
-                        // Parents house
-                        GameObject modemCord_go = GameObject.Find("YARD/Building/LIVINGROOM/Telephone 1/Cord");
-                        PlayMakerFSM modemCord_fsm = modemCord_go.GetPlayMaker("Use");
-                        installPoint.modemCord = modemCord_fsm.GetVariable<FsmBool>("CordModem");
 
-                        GameObject phoneBill_go = GameObject.Find("Systems/PhoneBills1");
-                        PlayMakerFSM phoneBill_fsm = phoneBill_go.GetPlayMaker("Data");
-                        installPoint.phonePaid = phoneBill_fsm.GetVariable<FsmBool>("PhonePaid");
+                    pcCaseData = pcCase.GetPlayMaker("Data");
+                    if (pcCaseData != null) {
+                        pcCaseInstalled = pcCaseData.GetVariable<FsmBool>("Installed");
                     }
                     else {
-                        ModConsole.Error($"[386API] Error: Unknown assemblyID: {i}");
-                        return;
+                        Debug.LogError("[386API] Error: pcCase.Data not found");
                     }
+
+                    modemCord_fsm = modemCord_go?.GetPlayMaker("Use");
+                    if (modemCord_fsm != null) {
+                        modemConnected = modemCord_fsm.GetVariable<FsmBool>("CordModem");
+                    }
+                    else {
+                        Debug.LogError($"[386API] Error: ModemCord{i}.Use not found");
+                    }
+
+                    phoneBill_fsm = phoneBill_go?.GetPlayMaker("Data");
+                    if (phoneBill_fsm != null) {
+                        phonePaid = phoneBill_fsm.GetVariable<FsmBool>("PhonePaid");
+                    }
+                    else {
+                        Debug.LogError($"[386API] Error: PhoneBill{i}.Data not found");
+                    }
+
+                    InstallPoint installPoint = new InstallPoint() { 
+                        assemblyID = i,
+                        installed = pcCaseInstalled,
+                        modemCord = modemConnected,
+                        phonePaid = phonePaid,
+                    };
 
                     installPoints.Add(installPoint);
                 }
